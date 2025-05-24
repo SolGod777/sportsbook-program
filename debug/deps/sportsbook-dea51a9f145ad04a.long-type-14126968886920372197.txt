@@ -1,0 +1,1 @@
+anchor_lang::prelude::InterfaceAccount<'_, anchor_spl::token_2022::spl_token_2022::state::Mint>

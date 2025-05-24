@@ -1,0 +1,109 @@
+Streaming transaction logs mentioning J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y. Confirmed commitment
+Transaction executed in slot 2:
+  Signature: xmCnAVtUTLepMhdqzHP3Tozi3RUqKK3X9xfpfByC6TLzJLW5pMSESfupJE5hfT9gzAcGvhPargucuKUbgvBVgfC
+  Status: Ok
+  Log Messages:
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y invoke [1]
+    Program log: Instruction: Initialize
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y consumed 6855 of 200000 compute units
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y success
+Transaction executed in slot 3:
+  Signature: vUqNJfNELgYk4pDBRjtuyNz9XQTnCybHWmrLsHLjNLd6bLiM6BWdhBi2eW4nnqrVQgehjeZzwhgfFaaqu6ey6U8
+  Status: Ok
+  Log Messages:
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y invoke [1]
+    Program log: Instruction: RegisterBet
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y consumed 7002 of 200000 compute units
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y success
+Transaction executed in slot 9:
+  Signature: 5T1VzexgfxMxcv7wcje3GzkXP89TmYWuzGXL8shrrFEgfeXHpjVu2oTB8qNaedvcUBitkWJuiGPzUuYpxZyQ8gRP
+  Status: Ok
+  Log Messages:
+    Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]
+    Program log: Create
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+    Program log: Instruction: GetAccountDataSize
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 928 of 191644 compute units
+    Program return: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb qgAAAAAAAAA=
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program log: Initialize the associated token account
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+    Program log: Instruction: InitializeImmutableOwner
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 487 of 185786 compute units
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+    Program log: Instruction: InitializeAccount3
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1440 of 182911 compute units
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+    Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 18833 of 200000 compute units
+    Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success
+Transaction executed in slot 10:
+  Signature: 5T1VzexgfxMxcv7wcje3GzkXP89TmYWuzGXL8shrrFEgfeXHpjVu2oTB8qNaedvcUBitkWJuiGPzUuYpxZyQ8gRP
+  Status: Ok
+  Log Messages:
+    Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]
+    Program log: Create
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+    Program log: Instruction: GetAccountDataSize
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 928 of 191644 compute units
+    Program return: TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb qgAAAAAAAAA=
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program log: Initialize the associated token account
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+    Program log: Instruction: InitializeImmutableOwner
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 487 of 185786 compute units
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+    Program log: Instruction: InitializeAccount3
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1440 of 182911 compute units
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+    Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 18833 of 200000 compute units
+    Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success
+Transaction executed in slot 12:
+  Signature: 5CLynWDCpWrRs6BdKpB4E63fT2LVSHYpjScvtVJ5bgwB9iRBE9t74KAuaaP3pvxA4M9ge4XpggGybtKkB9wBxscV
+  Status: Ok
+  Log Messages:
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y invoke [1]
+    Program log: Instruction: PlaceBet
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+    Program log: Instruction: TransferChecked
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1738 of 187089 compute units
+    Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y consumed 15638 of 200000 compute units
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y success
+Transaction executed in slot 13:
+  Signature: 2hn3Dys64rmis2ZzUeyEevbZJ4vV1kVDbKsTQvrknfV5cf7Ebfbcc9SiSGDbouEWsjpKRDX5dghc4MtMpHsd9TTu
+  Status: Ok
+  Log Messages:
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y invoke [1]
+    Program log: Instruction: RegisterBet
+    Program 11111111111111111111111111111111 invoke [2]
+    Program 11111111111111111111111111111111 success
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y consumed 11502 of 200000 compute units
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y success
+Transaction executed in slot 13:
+  Signature: 5ziSLdKf3o24m4iRgtdHkQGPP5x8QKAtsu85VzexX6wmaQox8dTdRfLLF1K8aWeHuLWCnYwHSTbZat8SyvWRDqxG
+  Status: Ok
+  Log Messages:
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y invoke [1]
+    Program log: Instruction: SetWinner
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y consumed 9855 of 200000 compute units
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y success
+Transaction executed in slot 14:
+  Signature: 5ziSLdKf3o24m4iRgtdHkQGPP5x8QKAtsu85VzexX6wmaQox8dTdRfLLF1K8aWeHuLWCnYwHSTbZat8SyvWRDqxG
+  Status: Ok
+  Log Messages:
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y invoke [1]
+    Program log: Instruction: SetWinner
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y consumed 9855 of 200000 compute units
+    Program J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y success
