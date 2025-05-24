@@ -5,8 +5,12 @@ import { assert } from "chai";
 import { Sportsbook } from "../target/types/sportsbook";
 import {
   createAccount,
+  createInitializeMintInstruction,
+  createInitializeTransferFeeConfigInstruction,
   createMint,
+  ExtensionType,
   getAccount,
+  getMintLen,
   mintTo,
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
@@ -42,18 +46,44 @@ describe("sportsbook", () => {
 
     const mintKeypair = Keypair.generate();
 
-    // Create SPL2022 mint & accounts
-    mint = await createMint(
-      provider.connection,
-      user,
-      user.publicKey,
-      null,
-      6,
-      mintKeypair,
+    const mintLen = getMintLen([ExtensionType.TransferFeeConfig]);
+    console.log(mintLen);
+    const lamports =
+      await provider.connection.getMinimumBalanceForRentExemption(mintLen);
+
+    const createMintAccountIx = SystemProgram.createAccount({
+      fromPubkey: user.publicKey,
+      newAccountPubkey: mintKeypair.publicKey,
+      space: mintLen,
+      lamports,
+      programId: TOKEN_2022_PROGRAM_ID,
+    });
+
+    const initFeeIx = createInitializeTransferFeeConfigInstruction(
+      mintKeypair.publicKey,
+      user.publicKey, // config authority
+      null, // withdraw withheld authority
+      500, // 5% fee in basis points
+      BigInt(1_000_000),
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    const initMintIx = createInitializeMintInstruction(
+      mintKeypair.publicKey,
+      6, // decimals
+      user.publicKey, // mint authority
       null,
       TOKEN_2022_PROGRAM_ID
     );
 
+    const tx = new anchor.web3.Transaction().add(
+      createMintAccountIx,
+      initFeeIx,
+      initMintIx
+    );
+    await provider.sendAndConfirm(tx, [user, mintKeypair]);
+
+    mint = mintKeypair.publicKey;
     [statePda, stateBump] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("state")],
       program.programId
@@ -142,8 +172,11 @@ describe("sportsbook", () => {
       program.programId
     );
 
+    const betAmount = new anchor.BN(400_000);
+    const amountAfterFee = 400_000 - Math.floor(400_000 * 0.05);
+
     await program.methods
-      .placeBet(betId, new anchor.BN(400000), 0)
+      .placeBet(betId, betAmount, 0)
       .accounts({
         user: user.publicKey,
         bet: betPda,
@@ -158,7 +191,7 @@ describe("sportsbook", () => {
       .rpc();
 
     const bet = await program.account.bet.fetch(betPda);
-    assert.equal(bet.totalPot.toNumber(), 400000);
+    assert.equal(bet.totalPot.toNumber(), amountAfterFee);
 
     const vaultAccount = await getAccount(
       provider.connection,
@@ -169,7 +202,7 @@ describe("sportsbook", () => {
 
     const vaultBalance = vaultAccount.amount;
     console.log("Vault balance:", vaultBalance.toString());
-    assert.equal(vaultBalance.toString(), "400000");
+    assert.equal(vaultBalance.toString(), amountAfterFee.toString());
   });
 
   it("Sets a side in a bet", async () => {

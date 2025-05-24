@@ -2,10 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program_pack::Pack;
 use anchor_lang::solana_program::{program::invoke_signed, system_instruction};
 use anchor_spl::token_2022::initialize_account3;
-use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use anchor_spl::token_interface::{self, TokenInterface, TransferChecked};
 
 declare_id!("J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y");
-
+const SFLOW_MINT_LEN: usize = 278;
 #[program]
 pub mod sportsbook {
 
@@ -17,14 +17,14 @@ pub mod sportsbook {
         let vault_key = ctx.accounts.vault.key();
 
         // Allocate space and fund the vault account manually
-        let rent = Rent::get()?.minimum_balance(165);
+        let rent = Rent::get()?.minimum_balance(SFLOW_MINT_LEN);
 
         invoke_signed(
             &system_instruction::create_account(
                 ctx.accounts.payer.key,
                 &vault_key,
                 rent,
-                165 as u64,
+                SFLOW_MINT_LEN as u64,
                 ctx.accounts.token_program.key,
             ),
             &[
@@ -88,6 +88,11 @@ pub mod sportsbook {
         require!(side == 0 || side == 1, ErrorCode::InvalidSide);
         require!(vault.key() == state.vault, ErrorCode::InvalidVault);
 
+        let vault_before = {
+            let data = vault.try_borrow_data()?;
+            u64::from_le_bytes(data[64..72].try_into().unwrap())
+        };
+
         let cpi_accounts = TransferChecked {
             from: ctx.accounts.user_token_account.to_account_info(),
             to: vault.to_account_info(),
@@ -98,11 +103,19 @@ pub mod sportsbook {
         let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
         token_interface::transfer_checked(cpi_context, amount, 6)?;
 
+        let vault_after = {
+            let data = ctx.accounts.vault.try_borrow_data()?;
+            u64::from_le_bytes(data[64..72].try_into().unwrap())
+        };
+
+        let received = vault_after
+            .checked_sub(vault_before)
+            .ok_or_else(|| error!(ErrorCode::MathOverflow))?;
         let user_bet = &mut ctx.accounts.user_bet;
-        user_bet.amount = amount;
+        user_bet.amount = received;
         user_bet.bet = bet.key();
 
-        bet.total_pot += amount;
+        bet.total_pot += received;
         Ok(())
     }
 
@@ -290,4 +303,6 @@ pub enum ErrorCode {
     InvalidSide,
     #[msg("Invalid vault.")]
     InvalidVault,
+    #[msg("MathOverflow.")]
+    MathOverflow,
 }
