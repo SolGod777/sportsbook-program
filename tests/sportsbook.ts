@@ -38,6 +38,7 @@ describe("sportsbook", () => {
   let userTokenAccount: PublicKey;
   let userBetPda: PublicKey;
   let user = Keypair.generate();
+  let adminTokenAccount: PublicKey;
 
   it("Initializes the state", async () => {
     // Airdrop SOL to the test user
@@ -84,6 +85,16 @@ describe("sportsbook", () => {
     await provider.sendAndConfirm(tx, [user, mintKeypair]);
 
     mint = mintKeypair.publicKey;
+    adminTokenAccount = await createAccount(
+      provider.connection,
+      user,
+      mint,
+      admin,
+      undefined,
+      undefined,
+      TOKEN_2022_PROGRAM_ID
+    );
+
     [statePda, stateBump] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("state")],
       program.programId
@@ -155,6 +166,18 @@ describe("sportsbook", () => {
       provider.connection,
       user,
       mint,
+      adminTokenAccount,
+      user,
+      1000_000_000,
+      [],
+      undefined,
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    await mintTo(
+      provider.connection,
+      user,
+      mint,
       userTokenAccount,
       user,
       1_000_000,
@@ -203,6 +226,86 @@ describe("sportsbook", () => {
     const vaultBalance = vaultAccount.amount;
     console.log("Vault balance:", vaultBalance.toString());
     assert.equal(vaultBalance.toString(), amountAfterFee.toString());
+  });
+
+  it("Claims winnings with 5% fee", async () => {
+    await program.methods
+      .fundVault(new anchor.BN(800_000))
+      .accounts({
+        admin,
+        adminTokenAccount,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        mint,
+        vault: vaultPda,
+      })
+      .rpc();
+    const vaultAccount = await getAccount(
+      provider.connection,
+      vaultPda,
+      null,
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    const vaultBalance = vaultAccount.amount;
+    console.log("Vault balance:", vaultBalance.toString());
+    // Fetch user's token account balance before
+    let userBefore = await getAccount(
+      provider.connection,
+      userTokenAccount,
+      undefined,
+      TOKEN_2022_PROGRAM_ID
+    );
+    const balanceBefore = Number(userBefore.amount);
+
+    // Simulate game result
+    await program.methods
+      .setWinner(betId, 0)
+      .accounts({
+        admin,
+        bet: betPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    // Claim winnings
+    await program.methods
+      .claimWinnings(betId)
+      .accounts({
+        user: user.publicKey,
+        bet: betPda,
+        userBet: userBetPda,
+        userTokenAccount,
+        vault: vaultPda,
+        vaultAuthority: vaultPda,
+        mint,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        state: statePda,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([user])
+      .rpc();
+
+    // Fetch user's token account balance after
+    let userAfter = await getAccount(
+      provider.connection,
+      userTokenAccount,
+      undefined,
+      TOKEN_2022_PROGRAM_ID
+    );
+    const balanceAfter = Number(userAfter.amount);
+
+    const betAmount = 400_000;
+    const netPlaced = Math.floor(betAmount * 0.95); // 380,000
+    const expectedWinnings = Math.floor(netPlaced * 2.05); // 779,000
+    const expectedReceived = Math.floor(expectedWinnings * 0.95); // 740,050
+
+    const received = balanceAfter - balanceBefore;
+    console.log("Winnings claimed (net after fee):", received);
+
+    assert.ok(
+      Math.abs(received - expectedReceived) <= 1,
+      `Expected ${expectedReceived}, but got ${received}`
+    );
   });
 
   it("Sets a side in a bet", async () => {

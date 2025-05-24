@@ -66,6 +66,41 @@ pub mod sportsbook {
         Ok(())
     }
 
+    pub fn fund_vault(ctx: Context<FundVault>, amount: u64) -> Result<()> {
+        let state = &ctx.accounts.state;
+        let vault = &mut ctx.accounts.vault;
+        let admin = &mut ctx.accounts.admin;
+
+        require!(state.admin == admin.key(), ErrorCode::Unauthorized);
+        require!(vault.key() == state.vault, ErrorCode::InvalidVault);
+
+        let vault_before = {
+            let data = vault.try_borrow_data()?;
+            u64::from_le_bytes(data[64..72].try_into().unwrap())
+        };
+
+        let cpi_accounts = TransferChecked {
+            from: ctx.accounts.admin_token_account.to_account_info(),
+            to: vault.to_account_info(),
+            mint: ctx.accounts.mint.to_account_info(),
+            authority: ctx.accounts.admin.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
+        token_interface::transfer_checked(cpi_context, amount, 6)?;
+
+        let vault_after = {
+            let data = ctx.accounts.vault.try_borrow_data()?;
+            u64::from_le_bytes(data[64..72].try_into().unwrap())
+        };
+
+        let _received = vault_after
+            .checked_sub(vault_before)
+            .ok_or_else(|| error!(ErrorCode::MathOverflow))?;
+
+        Ok(())
+    }
+
     pub fn set_winner(ctx: Context<SetWinner>, bet_id: u64, side: u8) -> Result<()> {
         let bet = &mut ctx.accounts.bet;
         require!(
@@ -80,7 +115,7 @@ pub mod sportsbook {
         Ok(())
     }
 
-    pub fn place_bet(ctx: Context<BetHandler>, bet_id: u64, amount: u64, side: u8) -> Result<()> {
+    pub fn place_bet(ctx: Context<PlaceBet>, bet_id: u64, amount: u64, side: u8) -> Result<()> {
         let state = &ctx.accounts.state;
         let bet = &mut ctx.accounts.bet;
         let vault = &mut ctx.accounts.vault;
@@ -119,7 +154,7 @@ pub mod sportsbook {
         Ok(())
     }
 
-    pub fn claim_winnings(ctx: Context<BetHandler>, bet_id: u64) -> Result<()> {
+    pub fn claim_winnings(ctx: Context<ClaimWinnings>, bet_id: u64) -> Result<()> {
         let state = &ctx.accounts.state;
         let bet = &mut ctx.accounts.bet;
         let vault = &ctx.accounts.vault;
@@ -127,19 +162,29 @@ pub mod sportsbook {
 
         require!(!bet.open, ErrorCode::BetOpen);
         require!(vault.key() == state.vault, ErrorCode::InvalidVault);
+        require!(bet.side == user_bet.side, ErrorCode::LostBet);
 
         let base = user_bet.amount;
         let winnings = (base * 205) / 100;
+        msg!(&winnings.to_string());
 
         let cpi_accounts = TransferChecked {
             from: vault.to_account_info(),
             to: ctx.accounts.user_token_account.to_account_info(),
             mint: ctx.accounts.mint.to_account_info(),
-            authority: ctx.accounts.user.to_account_info(),
+            authority: ctx.accounts.vault_authority.to_account_info(),
         };
         let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
+        let signer_seeds: &[&[&[u8]]] = &[&[b"vault", &[ctx.bumps.vault_authority]]];
+
+        let cpi_context = CpiContext::new_with_signer(
+            cpi_program,
+            cpi_accounts,
+            signer_seeds,
+        );
+        
         token_interface::transfer_checked(cpi_context, winnings, 6)?;
+        
 
         let user_bet = &mut ctx.accounts.user_bet;
         user_bet.amount = 0;
@@ -192,6 +237,32 @@ pub struct RegisterBet<'info> {
 
 #[derive(Accounts)]
 #[instruction(bet_id: u64)]
+pub struct FundVault<'info> {
+    #[account(
+        seeds = [b"state"],
+        bump
+    )]
+    pub state: Account<'info, State>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    /// CHECK: Validated by transfer_checked CPI
+    #[account(mut)]
+    pub admin_token_account: AccountInfo<'info>,
+
+    /// CHECK: Vault token account PDA will be created via CPI
+    #[account(mut)]
+    pub vault: AccountInfo<'info>,
+
+    /// CHECK: Mint passed to transfer_checked CPI
+    pub mint: AccountInfo<'info>,
+    /// CHECK: This is a Token-2022 program, manually verified
+    pub token_program: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(bet_id: u64)]
 pub struct SetWinner<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
@@ -214,7 +285,7 @@ pub struct SetWinner<'info> {
 
 #[derive(Accounts)]
 #[instruction(bet_id: u64)]
-pub struct BetHandler<'info> {
+pub struct PlaceBet<'info> {
     /// CHECK: Validated by transfer_checked CPI
     #[account(mut)]
     pub user_token_account: AccountInfo<'info>,
@@ -251,6 +322,50 @@ pub struct BetHandler<'info> {
     /// CHECK: Validated by transfer_checked CPI
     #[account(mut)]
     pub vault: AccountInfo<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(bet_id: u64)]
+pub struct ClaimWinnings<'info> {
+    /// CHECK: Validated by transfer_checked CPI
+    #[account(mut)]
+    pub user_token_account: AccountInfo<'info>,
+
+    /// CHECK: Mint passed to transfer_checked CPI
+    pub mint: AccountInfo<'info>,
+
+    #[account(
+        seeds = [b"state"],
+        bump
+    )]
+    pub state: Account<'info, State>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
+
+    #[account(
+        mut,
+        seeds = [b"bet", bet_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub bet: Account<'info, Bet>,
+
+    #[account( 
+        seeds = [b"user_bet", bet_id.to_le_bytes().as_ref(), user.key().as_ref()],
+        bump
+    )]
+    pub user_bet: Account<'info, UserBet>,
+
+    /// CHECK: Validated by transfer_checked CPI
+    #[account(mut)]
+    pub vault: AccountInfo<'info>,
+
+    /// CHECK: PDA authority for the vault
+    #[account(seeds = [b"vault"], bump)]
+    pub vault_authority: AccountInfo<'info>,    
 
     pub system_program: Program<'info, System>,
 }
@@ -301,6 +416,8 @@ pub enum ErrorCode {
     BetOpen,
     #[msg("Invalid side. Must be 0 (home) or 1 (away).")]
     InvalidSide,
+    #[msg("LostBet")]
+    LostBet,
     #[msg("Invalid vault.")]
     InvalidVault,
     #[msg("MathOverflow.")]
