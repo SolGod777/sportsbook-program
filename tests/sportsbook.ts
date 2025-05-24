@@ -6,6 +6,7 @@ import { Sportsbook } from "../target/types/sportsbook";
 import {
   createAccount,
   createMint,
+  getAccount,
   mintTo,
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
@@ -24,13 +25,42 @@ describe("sportsbook", () => {
 
   let betPda: PublicKey;
   let betBump: number;
+
   const betId = new anchor.BN(42);
 
   let vaultPda: PublicKey;
   let vaultBump: number;
+  let mint: PublicKey;
+  let userTokenAccount: PublicKey;
+  let userBetPda: PublicKey;
+  let user = Keypair.generate();
+
   it("Initializes the state", async () => {
+    // Airdrop SOL to the test user
+    await provider.connection.requestAirdrop(user.publicKey, 2e9);
+    await new Promise((r) => setTimeout(r, 2000));
+
+    const mintKeypair = Keypair.generate();
+
+    // Create SPL2022 mint & accounts
+    mint = await createMint(
+      provider.connection,
+      user,
+      user.publicKey,
+      null,
+      6,
+      mintKeypair,
+      null,
+      TOKEN_2022_PROGRAM_ID
+    );
+
     [statePda, stateBump] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("state")],
+      program.programId
+    );
+
+    [vaultPda, vaultBump] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault")],
       program.programId
     );
 
@@ -39,11 +69,24 @@ describe("sportsbook", () => {
       .accounts({
         state: statePda,
         payer: admin,
+        vault: vaultPda,
+        mint,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
       .rpc();
 
+    const vaultAccount = await getAccount(
+      provider.connection,
+      vaultPda,
+      null,
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    const vaultBalance = vaultAccount.amount;
+    console.log("Vault balance:", vaultBalance.toString());
     const state = await program.account.state.fetch(statePda);
+    console.log("state", state);
     assert.ok(state.admin.equals(admin));
   });
 
@@ -67,30 +110,6 @@ describe("sportsbook", () => {
     assert.equal(bet.open, true);
   });
   it("Places a bet", async () => {
-    let mint: PublicKey;
-    let user = Keypair.generate();
-    let userTokenAccount: PublicKey;
-    let vault: PublicKey;
-    let userBetPda: PublicKey;
-
-    // Airdrop SOL to the test user
-    await provider.connection.requestAirdrop(user.publicKey, 2e9);
-    await new Promise((r) => setTimeout(r, 2000));
-
-    const mintKeypair = Keypair.generate();
-
-    // Create SPL2022 mint & accounts
-    mint = await createMint(
-      provider.connection,
-      user,
-      user.publicKey,
-      null,
-      6,
-      mintKeypair,
-      null,
-      TOKEN_2022_PROGRAM_ID
-    );
-
     userTokenAccount = await createAccount(
       provider.connection,
       user,
@@ -101,19 +120,6 @@ describe("sportsbook", () => {
       TOKEN_2022_PROGRAM_ID
     );
 
-    [vaultPda, vaultBump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("vault"), betId.toArrayLike(Buffer, "le", 8)],
-      program.programId
-    );
-    vault = await createAccount(
-      provider.connection,
-      user,
-      mint,
-      program.programId,
-      undefined,
-      undefined,
-      TOKEN_2022_PROGRAM_ID
-    );
     // Mint tokens to user
     await mintTo(
       provider.connection,
@@ -143,7 +149,7 @@ describe("sportsbook", () => {
         bet: betPda,
         userBet: userBetPda,
         userTokenAccount: userTokenAccount,
-        vault: vault,
+        vault: vaultPda,
         mint,
         tokenProgram: TOKEN_2022_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
@@ -153,6 +159,17 @@ describe("sportsbook", () => {
 
     const bet = await program.account.bet.fetch(betPda);
     assert.equal(bet.totalPot.toNumber(), 400000);
+
+    const vaultAccount = await getAccount(
+      provider.connection,
+      vaultPda,
+      null,
+      TOKEN_2022_PROGRAM_ID
+    );
+
+    const vaultBalance = vaultAccount.amount;
+    console.log("Vault balance:", vaultBalance.toString());
+    assert.equal(vaultBalance.toString(), "400000");
   });
 
   it("Sets a side in a bet", async () => {
