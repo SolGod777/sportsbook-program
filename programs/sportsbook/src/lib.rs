@@ -3,9 +3,18 @@ use anchor_lang::solana_program::program_pack::Pack;
 use anchor_lang::solana_program::{program::invoke_signed, system_instruction};
 use anchor_spl::token_2022::initialize_account3;
 use anchor_spl::token_interface::{self, TokenInterface, TransferChecked};
+mod error;
+use error::ErrorCode;
+
+mod consts;
+use consts::*;
+
+mod state;
+
+mod contexts;
+use contexts::*;
 
 declare_id!("J7dkoQWFE736V1BfQgfiiqXe9pHH69gsEghbUoY4sb5y");
-const SFLOW_MINT_LEN: usize = 278;
 #[program]
 pub mod sportsbook {
 
@@ -55,6 +64,8 @@ pub mod sportsbook {
 
         ctx.accounts.state.admin = admin;
         ctx.accounts.state.vault = vault_key;
+        ctx.accounts.state.reward_multiplier = 205;
+        ctx.accounts.state.max_bet = 1_000_000 * SFLOW_DECIMALS;
         Ok(())
     }
 
@@ -122,6 +133,7 @@ pub mod sportsbook {
         require!(bet.open, ErrorCode::BetClosed);
         require!(side == 0 || side == 1, ErrorCode::InvalidSide);
         require!(vault.key() == state.vault, ErrorCode::InvalidVault);
+        require!(amount <= state.max_bet, ErrorCode::MaxBetExceeded);
 
         let vault_before = {
             let data = vault.try_borrow_data()?;
@@ -177,249 +189,47 @@ pub mod sportsbook {
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let signer_seeds: &[&[&[u8]]] = &[&[b"vault", &[ctx.bumps.vault_authority]]];
 
-        let cpi_context = CpiContext::new_with_signer(
-            cpi_program,
-            cpi_accounts,
-            signer_seeds,
-        );
-        
+        let cpi_context = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+
         token_interface::transfer_checked(cpi_context, winnings, 6)?;
-        
 
         let user_bet = &mut ctx.accounts.user_bet;
         user_bet.amount = 0;
 
         Ok(())
     }
-}
 
-// contexts
-#[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(init, payer = payer, space = 8 + State::LEN, seeds = [b"state"], bump)]
-    pub state: Account<'info, State>,
+    pub fn set_max_bet(ctx: Context<SetSettings>, max_bet: u64) -> Result<()> {
+        let state = &mut ctx.accounts.state;
 
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    /// CHECK: Vault token account PDA will be created via CPI
-    #[account(mut)]
-    pub vault: AccountInfo<'info>,
+        state.max_bet = max_bet;
 
-    /// CHECK: PDA that will be the authority of the vault
-    #[account(seeds = [b"vault"], bump)]
-    pub vault_authority: AccountInfo<'info>,
+        Ok(())
+    }
 
-    /// CHECK: Mint passed to transfer_checked CPI
-    pub mint: AccountInfo<'info>,
-    /// CHECK: This is a Token-2022 program, manually verified
-    pub token_program: AccountInfo<'info>,
+    pub fn set_reward_multiplier(ctx: Context<SetSettings>, reward_multiplier: u16) -> Result<()> {
+        let state = &mut ctx.accounts.state;
 
-    pub system_program: Program<'info, System>,
-}
+        state.reward_multiplier = reward_multiplier;
 
-#[derive(Accounts)]
-#[instruction(bet_id: u64)]
-pub struct RegisterBet<'info> {
-    #[account(mut)]
-    pub admin: Signer<'info>,
+        Ok(())
+    }
 
-    #[account(
-        init,
-        payer = admin,
-        space = 8 + Bet::LEN,
-        seeds = [b"bet", bet_id.to_le_bytes().as_ref()],
-        bump
-    )]
-    pub bet: Account<'info, Bet>,
+    pub fn delegate_admin(ctx: Context<SetSettings>, new_admin: Pubkey) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        require!(new_admin.key() != state.admin, ErrorCode::InvalidDelegate);
+        state.delegated_admin_role = new_admin.key();
 
-    pub system_program: Program<'info, System>,
-}
+        Ok(())
+    }
 
-#[derive(Accounts)]
-#[instruction(bet_id: u64)]
-pub struct FundVault<'info> {
-    #[account(
-        seeds = [b"state"],
-        bump
-    )]
-    pub state: Account<'info, State>,
+    pub fn accept_admin_role(ctx: Context<AcceptAdminRole>) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        let new_admin = &ctx.accounts.new_admin;
 
-    #[account(mut)]
-    pub admin: Signer<'info>,
+        state.admin = new_admin.key();
+        msg!("Admin changed");
 
-    /// CHECK: Validated by transfer_checked CPI
-    #[account(mut)]
-    pub admin_token_account: AccountInfo<'info>,
-
-    /// CHECK: Vault token account PDA will be created via CPI
-    #[account(mut)]
-    pub vault: AccountInfo<'info>,
-
-    /// CHECK: Mint passed to transfer_checked CPI
-    pub mint: AccountInfo<'info>,
-    /// CHECK: This is a Token-2022 program, manually verified
-    pub token_program: AccountInfo<'info>,
-}
-
-#[derive(Accounts)]
-#[instruction(bet_id: u64)]
-pub struct SetWinner<'info> {
-    #[account(mut)]
-    pub admin: Signer<'info>,
-
-    #[account(
-        seeds = [b"state"],
-        bump
-    )]
-    pub state: Account<'info, State>,
-
-    #[account(
-        mut,
-        seeds = [b"bet", bet_id.to_le_bytes().as_ref()],
-        bump
-    )]
-    pub bet: Account<'info, Bet>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(bet_id: u64)]
-pub struct PlaceBet<'info> {
-    /// CHECK: Validated by transfer_checked CPI
-    #[account(mut)]
-    pub user_token_account: AccountInfo<'info>,
-
-    /// CHECK: Mint passed to transfer_checked CPI
-    pub mint: AccountInfo<'info>,
-
-    #[account(
-        seeds = [b"state"],
-        bump
-    )]
-    pub state: Account<'info, State>,
-
-    #[account(mut)]
-    pub user: Signer<'info>,
-    pub token_program: Interface<'info, TokenInterface>,
-
-    #[account(
-        mut,
-        seeds = [b"bet", bet_id.to_le_bytes().as_ref()],
-        bump
-    )]
-    pub bet: Account<'info, Bet>,
-
-    #[account(
-        init,
-        payer = user,
-        space = 8 + UserBet::LEN,
-        seeds = [b"user_bet", bet_id.to_le_bytes().as_ref(), user.key().as_ref()],
-        bump
-    )]
-    pub user_bet: Account<'info, UserBet>,
-
-    /// CHECK: Validated by transfer_checked CPI
-    #[account(mut)]
-    pub vault: AccountInfo<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(bet_id: u64)]
-pub struct ClaimWinnings<'info> {
-    /// CHECK: Validated by transfer_checked CPI
-    #[account(mut)]
-    pub user_token_account: AccountInfo<'info>,
-
-    /// CHECK: Mint passed to transfer_checked CPI
-    pub mint: AccountInfo<'info>,
-
-    #[account(
-        seeds = [b"state"],
-        bump
-    )]
-    pub state: Account<'info, State>,
-
-    #[account(mut)]
-    pub user: Signer<'info>,
-    pub token_program: Interface<'info, TokenInterface>,
-
-    #[account(
-        mut,
-        seeds = [b"bet", bet_id.to_le_bytes().as_ref()],
-        bump
-    )]
-    pub bet: Account<'info, Bet>,
-
-    #[account( 
-        seeds = [b"user_bet", bet_id.to_le_bytes().as_ref(), user.key().as_ref()],
-        bump
-    )]
-    pub user_bet: Account<'info, UserBet>,
-
-    /// CHECK: Validated by transfer_checked CPI
-    #[account(mut)]
-    pub vault: AccountInfo<'info>,
-
-    /// CHECK: PDA authority for the vault
-    #[account(seeds = [b"vault"], bump)]
-    pub vault_authority: AccountInfo<'info>,    
-
-    pub system_program: Program<'info, System>,
-}
-
-/// accounts
-#[account]
-pub struct State {
-    pub admin: Pubkey,
-    pub vault: Pubkey,
-}
-
-impl State {
-    pub const LEN: usize = 32 + 32; // pubkey
-}
-
-#[account]
-pub struct Bet {
-    pub id: u64,
-    pub open: bool,
-    pub side: u8,
-    pub total_pot: u64,
-}
-
-impl Bet {
-    pub const LEN: usize = 8 + 1 + 1 + 8;
-}
-
-#[account]
-pub struct UserBet {
-    pub user: Pubkey,
-    pub bet: Pubkey,
-    pub amount: u64,
-    pub side: u8, // 0 = home, 1 = away
-}
-
-impl UserBet {
-    pub const LEN: usize = 32 + 32 + 8 + 1;
-}
-
-// errors
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Only the admin can perform this action.")]
-    Unauthorized,
-    #[msg("Bet is closed.")]
-    BetClosed,
-    #[msg("Bet is open.")]
-    BetOpen,
-    #[msg("Invalid side. Must be 0 (home) or 1 (away).")]
-    InvalidSide,
-    #[msg("LostBet")]
-    LostBet,
-    #[msg("Invalid vault.")]
-    InvalidVault,
-    #[msg("MathOverflow.")]
-    MathOverflow,
+        Ok(())
+    }
 }

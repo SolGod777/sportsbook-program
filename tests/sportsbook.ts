@@ -341,4 +341,44 @@ describe("sportsbook", () => {
     assert.equal(bet.open, false);
     assert.equal(bet.side, 1);
   });
+  it("Delegates new admin role", async () => {
+    const betIdTemp = new anchor.BN(1);
+    let betPdaTemp: PublicKey;
+    let betBumpTemp: number;
+    [betPdaTemp, betBumpTemp] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("bet"), betIdTemp.toArrayLike(Buffer, "le", 8)],
+      program.programId
+    );
+    console.log(betPda);
+
+    const newAdmin = Keypair.generate();
+    await provider.connection.requestAirdrop(newAdmin.publicKey, 2e9);
+    await new Promise((r) => setTimeout(r, 2000));
+
+    await program.methods
+      .delegateAdmin(newAdmin.publicKey)
+      .accounts({
+        state: statePda,
+      })
+      .rpc();
+    let state = await program.account.state.fetch(statePda);
+
+    assert.equal(
+      state.delegatedAdminRole.toBase58(),
+      newAdmin.publicKey.toBase58()
+    );
+
+    await program.methods
+      .acceptAdminRole()
+      .accounts({
+        state: statePda,
+        newAdmin: newAdmin.publicKey,
+      })
+      .signers([newAdmin])
+      .rpc();
+
+    state = await program.account.state.fetch(statePda);
+
+    assert.equal(state.admin.toBase58(), newAdmin.publicKey.toBase58());
+  });
 });
