@@ -342,15 +342,6 @@ describe("sportsbook", () => {
     assert.equal(bet.side, 1);
   });
   it("Delegates new admin role", async () => {
-    const betIdTemp = new anchor.BN(1);
-    let betPdaTemp: PublicKey;
-    let betBumpTemp: number;
-    [betPdaTemp, betBumpTemp] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("bet"), betIdTemp.toArrayLike(Buffer, "le", 8)],
-      program.programId
-    );
-    console.log(betPda);
-
     const newAdmin = Keypair.generate();
     await provider.connection.requestAirdrop(newAdmin.publicKey, 2e9);
     await new Promise((r) => setTimeout(r, 2000));
@@ -358,6 +349,7 @@ describe("sportsbook", () => {
     await program.methods
       .delegateAdmin(newAdmin.publicKey)
       .accounts({
+        admin,
         state: statePda,
       })
       .rpc();
@@ -380,5 +372,36 @@ describe("sportsbook", () => {
     state = await program.account.state.fetch(statePda);
 
     assert.equal(state.admin.toBase58(), newAdmin.publicKey.toBase58());
+  });
+  it("Fails to delegate admin if caller is not admin", async () => {
+    const fakeAdmin = Keypair.generate();
+    await provider.connection.requestAirdrop(fakeAdmin.publicKey, 2e9);
+    await new Promise((r) => setTimeout(r, 2000));
+
+    const anotherUser = Keypair.generate();
+
+    try {
+      await program.methods
+        .delegateAdmin(anotherUser.publicKey)
+        .accounts({
+          state: statePda,
+          admin: fakeAdmin.publicKey,
+        })
+        .signers([fakeAdmin]) // Not the real admin
+        .rpc();
+
+      assert.fail("Expected Unauthorized error, but transaction succeeded");
+    } catch (err: any) {
+      // Anchor error code check
+      const anchorError = err.error || err;
+      const errorCode = anchorError?.errorCode?.code;
+      const errorMsg = anchorError?.errorMessage || anchorError.toString();
+
+      console.log("Caught error:", errorCode, errorMsg);
+      assert.ok(
+        errorCode === "Unauthorized" || errorMsg.includes("Unauthorized"),
+        `Expected Unauthorized error, got: ${errorMsg}`
+      );
+    }
   });
 });
